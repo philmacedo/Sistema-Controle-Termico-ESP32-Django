@@ -24,7 +24,7 @@ Este projeto consiste em um sistema de controle de temperatura em malha fechada 
 ![Circuito](Circuito/ckt.jpg)
 
 ### Dashboard de Supervisão
-![Dashboard](Circuito/Diagrama EngC(ATUALIZADO).drawio.png)
+![Dashboard](Circuito/Diagrama.png)
 
 ## ⚙️ Como Rodar a Simulação
 1. Acesse o projeto no Wokwi: `https://wokwi.com/projects/448807308377028609`
@@ -34,3 +34,4 @@ Este projeto consiste em um sistema de controle de temperatura em malha fechada 
 ## 👨‍💻 Autor
 
 **Philipy Macêdo Borges Ramos** Engenharia - UERJ
+
