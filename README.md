@@ -21,15 +21,16 @@ Este projeto consiste em um sistema de controle de temperatura em malha fechada 
 
 ## 📸 Screenshots
 ### Circuito no Wokwi
-![Circuito](Circuito/circuito_wokwi.png)
+![Circuito](Circuito/ckt.jpg)
 
 ### Dashboard de Supervisão
-![Dashboard](Circuito/dashboard_print.png)
+![Dashboard](Circuito/Diagrama EngC(ATUALIZADO).drawio.png)
 
 ## ⚙️ Como Rodar a Simulação
-1. Acesse o projeto no Wokwi: [Link para seu projeto Wokwi, se tiver]
+1. Acesse o projeto no Wokwi: `https://wokwi.com/projects/448807308377028609`
 2. O Backend está rodando em: `http://philipy.pythonanywhere.com`
 3. Inicie a simulação e observe os gráficos no site.
 
 ## 👨‍💻 Autor
+
 **Philipy Macêdo Borges Ramos** Engenharia - UERJ
