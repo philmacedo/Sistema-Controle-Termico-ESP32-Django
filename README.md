@@ -26,6 +26,9 @@ Este projeto consiste em um sistema de controle de temperatura em malha fechada 
 ### Dashboard de Supervisão
 ![Dashboard](Circuito/Diagrama.png)
 
+### 🎥 Demonstração Funcionando
+![Funcionamento do Sistema](Circuito/video3.mp4)
+
 ## ⚙️ Como Rodar a Simulação
 1. Acesse o projeto no Wokwi: `https://wokwi.com/projects/448807308377028609`
 2. O Backend está rodando em: `http://philipy.pythonanywhere.com`
@@ -34,4 +37,5 @@ Este projeto consiste em um sistema de controle de temperatura em malha fechada 
 ## 👨‍💻 Autor
 
 **Philipy Macêdo Borges Ramos** Engenharia - UERJ
+
 
