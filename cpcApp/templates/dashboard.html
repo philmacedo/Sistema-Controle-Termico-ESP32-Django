@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoramento de Servidor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card { 
+            border: none; 
+            border-radius: 15px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-2px); }
+        
+        @keyframes blinker { 50% { opacity: 0.5; } }
+        .blinking {
+            animation: blinker 1s linear infinite;
+            background-color: #dc3545 !important;
+            color: white !important;
+            font-weight: bold;
+        }
+        
+        .status-badge {
+            font-size: 0.9em;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-5">
+    <h2 class="text-center mb-4 fw-bold text-dark">Painel de Controle Térmico (ESP32)</h2>
+
+    <!-- LINHA DE CARDS -->
+    <div class="row text-center mb-4">
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <h6 class="text-muted">Conexão</h6>
+                <div id="status-rede" class="status-badge bg-secondary text-white mt-2">
+                    Aguardando...
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <h6 class="text-muted">Status de Segurança</h6>
+                <div id="status-seguranca" class="status-badge bg-success text-white mt-2">
+                    NORMAL
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <h6 class="text-muted">Temperatura Atual</h6>
+                <h2 id="temp-display" class="fw-bold mt-1">-- °C</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <h6 class="text-muted">Potência Ventoinha</h6>
+                <h2 id="fan-display" class="text-primary fw-bold mt-1">-- %</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- LINHA PRINCIPAL -->
+    <div class="row">
+        <!-- COLUNA DA ESQUERDA: GRÁFICO -->
+        <div class="col-md-8">
+            <div class="card p-4 h-100">
+                <h5 class="mb-3">Histórico em Tempo Real</h5>
+                <!-- Container com altura fixa para o gráfico não bugar -->
+                <div style="position: relative; height: 350px; width: 100%;">
+                    <canvas id="pidChart"></canvas> 
+                </div>
+            </div>
+        </div> <!-- Faltava fechar esta div aqui! -->
+
+        <!-- COLUNA DA DIREITA: CONTROLES -->
+        <div class="col-md-4">
+            <div class="card p-4 mb-3 text-center">
+                <h5 class="text-danger fw-bold mb-3">🚨 CONTROLE DE PÂNICO</h5>
+                <p class="small text-muted">Use apenas em caso de falha crítica.</p>
+                <button id="btn-panico" class="btn btn-outline-danger btn-lg w-100 py-3" onclick="toggleEmergencia()">
+                    ATIVAR CORTE
+                </button>
+            </div>
+
+            <div class="card p-4">
+                <h5>Definir Meta (°C)</h5>
+                <div class="input-group mt-2">
+                    <input type="number" id="novo-sp" class="form-control" placeholder="40.0" step="0.5">
+                    <button class="btn btn-primary" onclick="enviarSetpoint()">Enviar</button>
+                </div>
+                <div id="sp-feedback" class="mt-2 text-success small fw-bold"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const DEVICE_ID = "ESP32_01"; 
+    
+    const ctx = document.getElementById('pidChart').getContext('2d');
+    const pidChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [], 
+            datasets: [
+                {
+                    label: 'Temperatura (°C)',
+                    data: [],
+                    borderColor: '#ff6384',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Setpoint',
+                    data: [],
+                    borderColor: '#36a2eb',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // Importante para obedecer a altura da div
+            animation: false,
+            scales: {
+                y: { ticks: { stepSize: 1 } },
+                x: { display: false }
+            },
+            plugins: { legend: { position: 'top' } }
+        }
+    });
+
+    async function atualizarDados() {
+        try {
+            const response = await fetch(`/status/${DEVICE_ID}/`);
+            const data = await response.json();
+
+            if (response.ok) {
+                // 1. Dados Básicos
+                document.getElementById('temp-display').innerText = data.temperatura.toFixed(1) + " °C";
+                document.getElementById('fan-display').innerText = data.duty_cycle + " %";
+                
+                const badgeRede = document.getElementById('status-rede');
+                badgeRede.innerText = "ONLINE";
+                badgeRede.className = "status-badge bg-success text-white";
+
+                // --- 2. LÓGICA DE SEGURANÇA ---
+                const badgeSeg = document.getElementById('status-seguranca');
+                const btn = document.getElementById('btn-panico');
+
+                if (data.remote_cutoff) {
+                    badgeSeg.innerText = "CORTE MANUAL (PÂNICO)";
+                    badgeSeg.className = "status-badge blinking";
+                } 
+                else if (data.alerta_porta) {
+                    badgeSeg.innerText = "ALERTA: PORTA ABERTA";
+                    badgeSeg.className = "status-badge blinking";
+                } 
+                else if (data.alerta_vibra) {
+                    badgeSeg.innerText = "ALERTA: VIBRAÇÃO DETECTADA";
+                    badgeSeg.className = "status-badge blinking";
+                } 
+                else if (!data.relay) { 
+                    badgeSeg.innerText = "ALERTA: RELÉ DESLIGADO";
+                    badgeSeg.className = "status-badge blinking";
+                } 
+                else if (data.duty_cycle === 100 && data.temperatura < data.setpoint) {
+                    badgeSeg.innerText = "MODO TURBO ATIVO 🚀";
+                    badgeSeg.className = "status-badge bg-warning text-dark fw-bold";
+                } 
+                else {
+                    badgeSeg.innerText = "SISTEMA SEGURO";
+                    badgeSeg.className = "status-badge bg-primary text-white";
+                }
+
+                // --- 3. LÓGICA DO BOTÃO (ATUALIZADA) ---
+                // O botão só vira "RESTAURAR" se o corte for REMOTO (originado pelo próprio Django).
+                // Se for porta aberta ou vibração, o botão continua como "ATIVAR CORTE" (ou poderia ser desativado).
+                
+                if (data.remote_cutoff) {
+                    btn.innerText = "RESTAURAR SISTEMA (NORMAL)";
+                    btn.className = "btn btn-success btn-lg w-100 py-3";
+                } else {
+                    btn.innerText = "ATIVAR CORTE DE EMERGÊNCIA";
+                    btn.className = "btn btn-outline-danger btn-lg w-100 py-3";
+                }
+
+                // 4. Atualiza Gráfico
+                const horario = new Date().toLocaleTimeString();
+                if (pidChart.data.labels.length > 30) {
+                    pidChart.data.labels.shift();
+                    pidChart.data.datasets[0].data.shift();
+                    pidChart.data.datasets[1].data.shift();
+                }
+                pidChart.data.labels.push(horario);
+                pidChart.data.datasets[0].data.push(data.temperatura);
+                pidChart.data.datasets[1].data.push(data.setpoint);
+                
+                pidChart.options.scales.y.suggestedMin = data.setpoint - 10;
+                pidChart.options.scales.y.suggestedMax = data.setpoint + 10;
+                pidChart.update();
+            }
+        } catch (error) {
+            console.error(error);
+            document.getElementById('status-rede').innerText = "OFFLINE";
+            document.getElementById('status-rede').className = "status-badge bg-secondary text-white";
+        }
+    }
+
+    async function enviarSetpoint() {
+        const valor = document.getElementById('novo-sp').value;
+        if (!valor) return;
+        await fetch(`/setpoint/${DEVICE_ID}/${valor}/`);
+        const feedback = document.getElementById('sp-feedback');
+        feedback.innerText = "Enviado! Aguarde atualização...";
+        setTimeout(() => feedback.innerText = "", 3000);
+    }
+
+    async function toggleEmergencia() {
+        await fetch(`/emergencia/${DEVICE_ID}/`);
+    }
+
+    setInterval(atualizarDados, 2000);
+    atualizarDados();
+</script>
+
+</body>
+</html>
